@@ -1,0 +1,79 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'floder1/**'
+      - 'floder2/**'
+      - 'floder3/**'
+
+jobs:
+  build-image1:
+    if: contains(github.event.head_commit.message, 'floder1') || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Login to Docker registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build image1
+        run: |
+          docker build -t myregistry.azurecr.io/image1:latest ./floder1
+          docker push myregistry.azurecr.io/image1:latest
+
+  build-deploy-image2:
+    if: contains(github.event.head_commit.message, 'floder2') || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Login to Docker registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build image2
+        run: |
+          docker build -t myregistry.azurecr.io/image2:latest ./floder2
+          docker push myregistry.azurecr.io/image2:latest
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Deploy to AKS
+        run: |
+          kubectl apply -f ./floder2/deployment.yaml
+          kubectl apply -f ./floder2/service.yaml
+
+  build-image3:
+    if: contains(github.event.head_commit.message, 'floder3') || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Login to Docker registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build image3
+        run: |
+          docker build -t myregistry.azurecr.io/image3:latest ./floder3
+          docker push myregistry.azurecr.io/image3:latest
